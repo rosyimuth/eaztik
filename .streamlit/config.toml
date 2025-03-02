@@ -1,0 +1,12 @@
+[theme]
+primaryColor = "#427d9d"
+backgroundColor = "#ffffee"
+secondaryBackgroundColor = "#6f9db3"
+textColor = "#1c4f74"
+fontFamily = "poppins"
+
+# Untuk mengaktifkan mode gelap
+[server]
+headless = true
+enableCORS = false
+enableWebsocketCompression = true
