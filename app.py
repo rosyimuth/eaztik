@@ -3,6 +3,8 @@ import paramiko
 from streamlit_option_menu import option_menu
 import socket 
 import ipaddress
+import re
+import time
 
 # Konfigurasi halaman
 st.set_page_config(page_title="EazT!k", layout="centered", page_icon="favicon.svg")
@@ -261,57 +263,84 @@ if selected == "DHCP Server":
     # Pilih Interface untuk DHCP
     interface = st.selectbox("Pilih Interface untuk DHCP", ["ether1", "ether2", "ether3", "ether4", "ether5", "wlan1"], help="Pilih interface jaringan tempat DHCP akan diaktifkan")
 
-    # Masukkan DHCP Address Space secara manual
-    dhcp_space = st.text_input("Masukkan DHCP Address Space", placeholder="192.168.88.0/24", help="Masukkan rentang alamat IP yang akan digunakan oleh DHCP")
+    # Koneksi SSH ke MikroTik
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(st.session_state.IP, username=st.session_state.user, password=st.session_state.passwd, port=st.session_state.port)
+
+    # Ambil IP Address dari Interface yang dipilih
+    address_command = f"/ip address print where interface={interface}"
+    stdin, stdout, stderr = client.exec_command(address_command)
+    address_output = stdout.read().decode('utf-8')
+
+    # Cari IP yang sesuai dari output
+    dhcp_space = ""
+    for line in address_output.splitlines():
+        if interface in line:
+            match = re.search(r"(\d+\.\d+\.\d+\.\d+/\d+)", line)
+            if match:
+                dhcp_space = match.group(1)
+                break
+
+    if not dhcp_space:
+        st.warning(f"⚠️ Tidak ditemukan IP pada interface {interface}. Masukkan secara manual!")
+        dhcp_space = st.text_input("Masukkan DHCP Address Space", placeholder="192.168.88.0/24", help="Masukkan rentang alamat IP yang akan digunakan oleh DHCP")
+    else:
+        st.text(f"DHCP Address Space Otomatis: {dhcp_space}")
 
     # Masukkan Lease Time
-    lease_time = st.text_input("Masukkan Lease Time", placeholder="1h", 
-    help="Waktu sewa IP oleh perangkat. Format: s (detik), m (menit), h (jam), d (hari)")
+    lease_time = st.text_input("Masukkan Lease Time", placeholder="1h", help="Waktu sewa IP oleh perangkat. Format: s (detik), m (menit), h (jam), d (hari)")
 
     connect = st.button("Proses")
 
     if connect:
         try:
-            # Mengonversi DHCP Address Space ke objek network
+            # Konversi DHCP Address Space ke objek network
             network = ipaddress.IPv4Network(dhcp_space, strict=False)
             
-            # Menghitung rentang IP untuk DHCP
-            dhcp_start = str(network.network_address + 2)  # IP pertama yang bisa digunakan
-            dhcp_end = str(network.network_address + network.num_addresses - 3)  # IP terakhir yang bisa digunakan
+            # Hitung rentang IP untuk DHCP
+            dhcp_start = str(network.network_address + 2)
+            dhcp_end = str(network.network_address + network.num_addresses - 3)
             
             # DNS yang digunakan
             dns = "8.8.8.8"
             
-            # Gateway, alamat terakhir dalam subnet (/24) biasanya .254
-            gateway = str(network.network_address + network.num_addresses - 2)
+            # Gateway: alamat pertama setelah network address
+            gateway = str(network.network_address + 1)     
 
-            # SSH client untuk koneksi MikroTik
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(st.session_state.IP, username=st.session_state.user, password=st.session_state.passwd, port=st.session_state.port)
-
-            # Periksa apakah address pool sudah ada atau buat baru
-            pool_check_command = f"/ip pool print where name=dhcp_pool"
+            # Periksa apakah address pool sudah ada
+            pool_check_command = "/ip pool print where name=dhcp_pool"
             stdin, stdout, stderr = client.exec_command(pool_check_command)
             output = stdout.read().decode('utf-8')
 
-            if "dhcp_pool" not in output:
-                # Konfigurasi address pool jika belum ada
+            if not any("dhcp_pool" in line for line in output.splitlines()):
                 pool_command = f"/ip pool add name=dhcp_pool ranges={dhcp_start}-{dhcp_end}"
                 client.exec_command(pool_command)
+                time.sleep(1)
 
-            # Konfigurasi DHCP Server
-            dhcp_command = f"/ip dhcp-server add address-pool=dhcp_pool interface={interface} lease-time={lease_time}"
-            client.exec_command(dhcp_command)
+            # Periksa apakah DHCP Server sudah ada di interface
+            dhcp_check_command = f"/ip dhcp-server print where interface={interface}"
+            stdin, stdout, stderr = client.exec_command(dhcp_check_command)
+            dhcp_output = stdout.read().decode('utf-8')
 
-            # Set DNS dan Gateway untuk DHCP
-            dns_command = f"/ip dhcp-server network add address={network.network_address} gateway={gateway} dns-server={dns}"
-            client.exec_command(dns_command)
+            if not any(interface in line for line in dhcp_output.splitlines()):
+                dhcp_command = f"/ip dhcp-server add address-pool=dhcp_pool interface={interface} lease-time={lease_time}"
+                client.exec_command(dhcp_command)
+                time.sleep(1)
+
+            # Periksa apakah konfigurasi jaringan DHCP sudah ada
+            network_check_command = f"/ip dhcp-server network print where address={network.network_address}"
+            stdin, stdout, stderr = client.exec_command(network_check_command)
+            network_output = stdout.read().decode('utf-8')
+
+            if not any(str(network.network_address) in line for line in network_output.splitlines()):
+                dns_command = f"/ip dhcp-server network add address={dhcp_space} gateway={gateway} dns-server={dns}"
+                client.exec_command(dns_command)
+                time.sleep(1)
 
             st.success(f"✅ DHCP Server berhasil dikonfigurasi di interface {interface} dengan IP Range {dhcp_start}-{dhcp_end}. DNS: {dns}, Gateway: {gateway}.")
         except Exception as e:
             st.error(f"⚠️ Gagal konfigurasi DHCP Server: {str(e)}")
-
 
 # ================== HALAMAN KONFIGURASI DNS ==================
 if selected == 'DNS':
