@@ -116,10 +116,10 @@ if selected == 'IP Address':
     st.title('Konfigurasi IP Address')
 
     # Input untuk IP Address
-    ip_address = st.text_input("Masukkan IP Address", placeholder="192.168.88.1/24")
+    ip_address = st.text_input("Masukkan IP Address", placeholder="192.168.88.1/24", help="Masukkan alamat IP dengan subnet mask yang sesuai untuk perangkat ini")
 
     # Pilihan untuk memilih interface
-    interface = st.selectbox("Pilih Interface", ["ether1", "ether2", "ether3", "ether4", "ether5", "wlan1"])
+    interface = st.selectbox("Pilih Interface", ["ether1", "ether2", "ether3", "ether4", "ether5", "wlan1"], help="Pilih interface jaringan yang akan digunakan")
 
     connect = st.button("Proses")
 
@@ -155,8 +155,8 @@ if selected == 'Routes':
     st.title('Konfigurasi Routes')
 
     # Input untuk Destination Address dan Gateway
-    dst_address = st.text_input("Masukkan Destination Address", placeholder="0.0.0.0/0")
-    gateway = st.text_input("Masukkan Gateway", placeholder="192.168.88.254")
+    dst_address = st.text_input("Masukkan Destination Address", placeholder="0.0.0.0/0", help="Masukkan alamat tujuan untuk rute ini")
+    gateway = st.text_input("Masukkan Gateway", placeholder="192.168.88.254", help="Masukkan alamat IP gateway yang digunakan untuk keluar dari jaringan lokal Anda")
 
     connect = st.button("Proses")
 
@@ -178,9 +178,9 @@ if selected == 'Routes':
 # ================== HALAMAN KONFIGURASI WIRELESS ==================
 if selected == 'Wireless':
     st.title('Konfigurasi Wireless')
-    ssid = st.text_input("Masukkan SSID Wireless Baru", placeholder="Masukkan SSID Wireless")
-    auth = st.text_input("Masukkan Password Wireless Baru", type="password", placeholder="Masukkan Password Wireless")
-    interface = st.selectbox("Pilih Interface Wireless", ["wlan1", "wlan2"])  # Pilih interface wireless
+    ssid = st.text_input("Masukkan SSID Wireless Baru", placeholder="Masukkan SSID Wireless", help="Masukkan nama jaringan Wi-Fi Anda.")
+    auth = st.text_input("Masukkan Password Wireless Baru", type="password", placeholder="Masukkan Password Wireless", help="Masukkan kata sandi untuk jaringan Wi-Fi Anda")
+    interface = st.selectbox("Pilih Interface Wireless", ["wlan1", "wlan2"], help="Pilih interface yang terhubung ke jaringan Wi-Fi")  # Pilih interface wireless
     connect = st.button("Proses")
 
     if connect:
@@ -259,13 +259,14 @@ if selected == "DHCP Server":
     st.title("Konfigurasi DHCP Server")
 
     # Pilih Interface untuk DHCP
-    interface = st.selectbox("Pilih Interface untuk DHCP", ["ether1", "ether2", "ether3", "ether4", "ether5", "wlan1"])
+    interface = st.selectbox("Pilih Interface untuk DHCP", ["ether1", "ether2", "ether3", "ether4", "ether5", "wlan1"], help="Pilih interface jaringan tempat DHCP akan diaktifkan")
 
     # Masukkan DHCP Address Space secara manual
-    dhcp_space = st.text_input("Masukkan DHCP Address Space", placeholder="192.168.88.0/24")
+    dhcp_space = st.text_input("Masukkan DHCP Address Space", placeholder="192.168.88.0/24", help="Masukkan rentang alamat IP yang akan digunakan oleh DHCP")
 
     # Masukkan Lease Time
-    lease_time = st.text_input("Masukkan Lease Time", "1h")
+    lease_time = st.text_input("Masukkan Lease Time", placeholder="1h", 
+    help="Waktu sewa IP oleh perangkat. Format: s (detik), m (menit), h (jam), d (hari)")
 
     connect = st.button("Proses")
 
@@ -317,14 +318,14 @@ if selected == 'DNS':
     st.title('Konfigurasi DNS')
     
     # Pilihan mode konfigurasi DNS
-    dns_mode = st.radio("Pilih Mode DNS:", ("Otomatis", "Manual"))
+    dns_mode = st.radio("Pilih Mode DNS:", ("Otomatis", "Manual"), help="Pilih apakah ingin menggunakan DNS otomatis atau mengatur secara manual")
     
     # Default DNS Google jika mode otomatis dipilih
     if dns_mode == "Otomatis":
         dns_server = "8.8.8.8,8.8.4.4"
         st.info("Menggunakan DNS Google: 8.8.8.8 dan 8.8.4.4")
     else:
-        dns_server = st.text_input("Masukkan DNS Server", placeholder="1.1.1.1")
+        dns_server = st.text_input("Masukkan DNS Server", placeholder="1.1.1.1", help="Masukkan alamat DNS yang ingin digunakan")
     
     connect = st.button("Proses")
     
@@ -348,11 +349,11 @@ if selected == 'DNS':
 if selected == 'Firewall':
     st.title('Konfigurasi Firewall')
     
-    # Input URL
-    url = st.text_input("Masukkan URL untuk diblokir atau diizinkan", placeholder="Masukkan URL")
+    # Input URL dengan tooltip
+    url = st.text_input("Masukkan URL untuk diblokir atau diizinkan", placeholder="Masukkan URL", help="Masukkan URL yang ingin dikonfigurasi dalam firewall")
     
-    # Pilih Aksi dengan keterangan
-    action = st.selectbox("Pilih Aksi", ["Accept", "Drop", "Reject"])
+    # Pilih Aksi dengan tooltip
+    action = st.selectbox("Pilih Aksi", ["Accept", "Drop", "Reject"], help="Pilih tindakan yang akan diterapkan pada URL yang dimasukkan")
     
     # Keterangan tentang aksi
     if action == "Accept":
