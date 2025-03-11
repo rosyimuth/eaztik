@@ -104,7 +104,7 @@ if selected == 'Dashboard':
     # Menampilkan ringkasan status perangkat
     col1, col2 = st.columns(2)
     col1.metric("📡 IP Address", st.session_state.get('IP', 'Tidak tersedia'))
-    col2.metric("🌐 Status Koneksi", "Tersambung" if st.session_state.get('Connected', True) else "Terputus", delta="🟢" if st.session_state.get('Connected', True) else "🔴")
+    col2.metric("🌐 Status Koneksi", "Terhubung" if st.session_state.get('Connected', True) else "Terputus", delta="🟢" if st.session_state.get('Connected', True) else "🔴")
 
     # Hanya satu kolom untuk tombol
     col1 = st.columns(1)[0]  # Ambil elemen pertama dari list kolom
@@ -261,8 +261,10 @@ if selected == "DHCP Server":
     # Pilih Interface untuk DHCP
     interface = st.selectbox("Pilih Interface untuk DHCP", ["ether1", "ether2", "ether3", "ether4", "ether5", "wlan1"])
 
-    # Masukkan DHCP Address Space
+    # Masukkan DHCP Address Space secara manual
     dhcp_space = st.text_input("Masukkan DHCP Address Space", placeholder="192.168.88.0/24")
+
+    # Masukkan Lease Time
     lease_time = st.text_input("Masukkan Lease Time", "1h")
 
     connect = st.button("Proses")
@@ -287,13 +289,19 @@ if selected == "DHCP Server":
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(st.session_state.IP, username=st.session_state.user, password=st.session_state.passwd, port=st.session_state.port)
 
-            # Perintah untuk mengonfigurasi DHCP Server
+            # Periksa apakah address pool sudah ada atau buat baru
+            pool_check_command = f"/ip pool print where name=dhcp_pool"
+            stdin, stdout, stderr = client.exec_command(pool_check_command)
+            output = stdout.read().decode('utf-8')
+
+            if "dhcp_pool" not in output:
+                # Konfigurasi address pool jika belum ada
+                pool_command = f"/ip pool add name=dhcp_pool ranges={dhcp_start}-{dhcp_end}"
+                client.exec_command(pool_command)
+
+            # Konfigurasi DHCP Server
             dhcp_command = f"/ip dhcp-server add address-pool=dhcp_pool interface={interface} lease-time={lease_time}"
             client.exec_command(dhcp_command)
-
-            # Konfigurasi address pool
-            pool_command = f"/ip pool add name=dhcp_pool ranges={dhcp_start}-{dhcp_end}"
-            client.exec_command(pool_command)
 
             # Set DNS dan Gateway untuk DHCP
             dns_command = f"/ip dhcp-server network add address={network.network_address} gateway={gateway} dns-server={dns}"
@@ -307,24 +315,31 @@ if selected == "DHCP Server":
 # ================== HALAMAN KONFIGURASI DNS ==================
 if selected == 'DNS':
     st.title('Konfigurasi DNS')
-
-    # Input untuk DNS Server
-    dns_server = st.text_input("Masukkan DNS Server", "8.8.8.8")  # Default DNS: Google Public DNS
-
+    
+    # Pilihan mode konfigurasi DNS
+    dns_mode = st.radio("Pilih Mode DNS:", ("Otomatis", "Manual"))
+    
+    # Default DNS Google jika mode otomatis dipilih
+    if dns_mode == "Otomatis":
+        dns_server = "8.8.8.8,8.8.4.4"
+        st.info("Menggunakan DNS Google: 8.8.8.8 dan 8.8.4.4")
+    else:
+        dns_server = st.text_input("Masukkan DNS Server", placeholder="1.1.1.1")
+    
     connect = st.button("Proses")
-
-    if connect and dns_server:
+    
+    if connect:
         try:
             # Koneksi SSH ke router
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(st.session_state.IP, username=st.session_state.user, 
                            password=st.session_state.passwd, port=st.session_state.port)
-
+            
             # Menambahkan DNS Server
             command = f'/ip dns set servers={dns_server}'
             client.exec_command(command)
-
+            
             st.success(f"✅ DNS Server {dns_server} berhasil ditambahkan.")
         except Exception as e:
             st.error(f"⚠️ Gagal menambahkan DNS Server: {str(e)}")
