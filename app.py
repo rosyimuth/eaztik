@@ -297,24 +297,27 @@ if selected == "DHCP Server":
         try:
             # Konversi DHCP Address Space ke objek network
             network = ipaddress.IPv4Network(dhcp_space, strict=False)
-            
+
             # Hitung rentang IP untuk DHCP
             dhcp_start = str(network.network_address + 2)
             dhcp_end = str(network.network_address + network.num_addresses - 3)
-            
+
             # DNS yang digunakan
             dns = "8.8.8.8"
-            
+
             # Gateway: alamat pertama setelah network address
-            gateway = str(network.network_address + 1)     
+            gateway = str(network.network_address + 1)
+
+            # Nama pool dinamis berdasarkan interface
+            pool_name = f"dhcp_pool_{interface}"
 
             # Periksa apakah address pool sudah ada
-            pool_check_command = "/ip pool print where name=dhcp_pool"
+            pool_check_command = f"/ip pool print where name={pool_name}"
             stdin, stdout, stderr = client.exec_command(pool_check_command)
             output = stdout.read().decode('utf-8')
 
-            if not any("dhcp_pool" in line for line in output.splitlines()):
-                pool_command = f"/ip pool add name=dhcp_pool ranges={dhcp_start}-{dhcp_end}"
+            if not any(pool_name in line for line in output.splitlines()):
+                pool_command = f"/ip pool add name={pool_name} ranges={dhcp_start}-{dhcp_end}"
                 client.exec_command(pool_command)
                 time.sleep(1)
 
@@ -324,7 +327,7 @@ if selected == "DHCP Server":
             dhcp_output = stdout.read().decode('utf-8')
 
             if not any(interface in line for line in dhcp_output.splitlines()):
-                dhcp_command = f"/ip dhcp-server add address-pool=dhcp_pool interface={interface} lease-time={lease_time}"
+                dhcp_command = f"/ip dhcp-server add address-pool={pool_name} interface={interface} lease-time={lease_time}"
                 client.exec_command(dhcp_command)
                 time.sleep(1)
 
@@ -338,9 +341,10 @@ if selected == "DHCP Server":
                 client.exec_command(dns_command)
                 time.sleep(1)
 
-            st.success(f"✅ DHCP Server berhasil dikonfigurasi di interface {interface} dengan IP Range {dhcp_start}-{dhcp_end}. DNS: {dns}, Gateway: {gateway}.")
+            st.success(f"✅ DHCP Server berhasil dikonfigurasi di interface {interface} dengan IP Range {dhcp_start} - {dhcp_end}. DNS: {dns}, Gateway: {gateway}. Pool: {pool_name}")
         except Exception as e:
             st.error(f"⚠️ Gagal konfigurasi DHCP Server: {str(e)}")
+
 
 # ================== HALAMAN KONFIGURASI DNS ==================
 if selected == 'DNS':
